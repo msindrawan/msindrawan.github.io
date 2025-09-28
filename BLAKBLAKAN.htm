@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot BLAKBLAKAN</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        #chat-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        #chat-container::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        #chat-container::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 10px;
+        }
+        #chat-container::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 flex items-center justify-center min-h-screen">
+
+    <div class="flex flex-col w-full max-w-2xl h-[95vh] md:h-[85vh] bg-white rounded-2xl shadow-2xl overflow-hidden">
+        
+        <header class="bg-gradient-to-r from-blue-500 to-indigo-600 p-4 text-white shadow-md z-10">
+            <h1 class="text-2xl font-bold text-center">BLAKBLAKAN</h1>
+            <p class="text-sm text-center opacity-90">Teman Belajar SMP-mu, Tanya Apa Aja!</p>
+        </header>
+
+        <main id="chat-container" class="flex-1 p-4 overflow-y-auto bg-slate-50">
+        </main>
+
+        <footer class="p-4 bg-white border-t border-slate-200">
+            <form id="chat-form" class="flex items-center space-x-3">
+                <input 
+                    type="text" 
+                    id="user-input"
+                    placeholder="Ketik pertanyaanmu di sini..."
+                    class="flex-1 p-3 border border-slate-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 transition duration-300"
+                    autocomplete="off">
+                <button 
+                    type="submit"
+                    class="bg-indigo-600 text-white rounded-full p-3 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-transform duration-200 active:scale-95 disabled:bg-indigo-300 disabled:cursor-not-allowed">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-send"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </button>
+            </form>
+        </footer>
+    </div>
+
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const chatForm = document.getElementById('chat-form');
+        const userInput = document.getElementById('user-input');
+        const submitButton = chatForm.querySelector('button');
+
+        // --- Konfigurasi API Gemini ---
+        // Kunci API sudah dimasukkan.
+        const apiKey = "AIzaSyCr86FHprBCSMjWu11S7ybNWIzp4O6_ujk"; 
+        
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+        const systemPrompt = `Kamu adalah "BLAKBLAKAN", sebuah chatbot AI yang super ramah, cerdas, dan lucu. Misi utamamu adalah membantu anak SMP mengerjakan tugas sekolah. Jawabanmu harus selalu akurat, mudah dimengerti, dan disajikan dengan gaya bahasa yang santai dan bersahabat, seperti sedang ngobrol dengan teman baik. Gunakan analogi yang relevan untuk anak SMP saat menjelaskan konsep yang sulit. Selalu berikan jawaban dalam Bahasa Indonesia.`;
+
+        let chatHistory = [];
+
+        function appendMessage(sender, text) {
+            const messageWrapper = document.createElement('div');
+            messageWrapper.className = `flex mb-4 ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
+
+            const messageBubble = document.createElement('div');
+            messageBubble.className = `max-w-xs md:max-w-md lg:max-w-lg p-3 rounded-2xl shadow ${sender === 'user' ? 'bg-indigo-500 text-white rounded-br-none' : 'bg-slate-200 text-slate-800 rounded-bl-none'}`;
+            
+            let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            formattedText = formattedText.replace(/^\* (.*$)/gm, '<li>$1</li>');
+            if (formattedText.includes('<li>')) {
+               formattedText = '<ul>' + formattedText.replace(/<\/li><li>/g, '</li><li>') + '</ul>';
+            }
+             
+            messageBubble.innerHTML = formattedText;
+
+            messageWrapper.appendChild(messageBubble);
+            chatContainer.appendChild(messageWrapper);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        function toggleLoading(show) {
+            let loadingIndicator = document.getElementById('loading-indicator');
+            if (show) {
+                if (!loadingIndicator) {
+                    loadingIndicator = document.createElement('div');
+                    loadingIndicator.id = 'loading-indicator';
+                    loadingIndicator.className = 'flex justify-start mb-4';
+                    loadingIndicator.innerHTML = `
+                        <div class="max-w-xs p-3 rounded-2xl shadow bg-slate-200 text-slate-800 rounded-bl-none flex items-center space-x-2">
+                            <div class="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style="animation-delay: -0.3s;"></div>
+                            <div class="w-2 h-2 bg-slate-500 rounded-full animate-bounce" style="animation-delay: -0.15s;"></div>
+                            <div class="w-2 h-2 bg-slate-500 rounded-full animate-bounce"></div>
+                        </div>
+                    `;
+                    chatContainer.appendChild(loadingIndicator);
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                }
+            } else {
+                if (loadingIndicator) {
+                    loadingIndicator.remove();
+                }
+            }
+        }
+
+        async function getAiResponse(userQuery) {
+            if (!apiKey) {
+                appendMessage('model', 'Kunci API tidak ditemukan. Pastikan kamu sudah memasukkannya di dalam kode.');
+                return;
+            }
+
+            toggleLoading(true);
+            submitButton.disabled = true;
+            userInput.disabled = true;
+            
+            chatHistory.push({ role: "user", parts: [{ text: userQuery }] });
+
+            const payload = {
+                contents: chatHistory,
+                tools: [{ "google_search": {} }],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    // Coba periksa apakah error disebabkan oleh API key yang tidak valid
+                    const errorData = await response.json();
+                    if (errorData.error && errorData.error.message.includes('API key not valid')) {
+                         throw new Error('API key tidak valid. Mohon periksa kembali.');
+                    }
+                    throw new Error(`Terjadi error pada API! Status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                const candidate = result.candidates?.[0];
+                let aiText = "Waduh, aku lagi bingung nih. Coba tanya lagi dengan cara yang berbeda ya.";
+
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    aiText = candidate.content.parts[0].text;
+                }
+                
+                chatHistory.push({ role: "model", parts: [{ text: aiText }] });
+                appendMessage('model', aiText);
+
+            } catch (error) {
+                console.error("Error saat mengambil respon AI:", error);
+                appendMessage('model', `Duh, maaf, ada masalah nih: ${error.message}. Coba periksa kembali Kunci API dan koneksi internetmu ya.`);
+            } finally {
+                toggleLoading(false);
+                submitButton.disabled = false;
+                userInput.disabled = false;
+                userInput.focus();
+            }
+        }
+
+        chatForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const userQuery = userInput.value.trim();
+            if (userQuery) {
+                appendMessage('user', userQuery);
+                getAiResponse(userQuery);
+                userInput.value = '';
+            }
+        });
+
+        function showInitialMessage() {
+            setTimeout(() => {
+                const welcomeText = "Halo! Aku BLAKBLAKAN, teman belajarmu. Ada tugas yang bikin pusing? Tanya aja ke aku, nanti kita kerjain bareng-bareng! 😄";
+                appendMessage('model', welcomeText);
+                chatHistory.push({ role: "model", parts: [{ text: welcomeText }] });
+            }, 500);
+        }
+        
+        window.onload = showInitialMessage;
+    </script>
+</body>
+</html>
+
+
